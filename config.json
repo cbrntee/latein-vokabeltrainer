@@ -15,14 +15,5 @@
   "sessionSize": 25,
 
   "_comment_leitner": "Intervalle (in Lerntagen) für die 5 Leitner-Boxen. Box 1 = Wort war zuletzt falsch/neu, Box 5 = sehr gut gekonnt.",
-  "leitnerIntervals": [1, 2, 4, 8, 16],
-
-  "_comment_github": "Zentrale Speicherung des Fortschritts über ein privates GitHub-Repo. Token braucht nur 'Contents: Read and write' auf genau dieses Repo. Diese Datei liegt neben trainer.html - beides darf NICHT öffentlich erreichbar sein, da der Token im Klartext steht.",
-  "github": {
-    "owner": "cbrntee",
-    "repo": "latein-vokabeltrainer",
-    "path": "progress.json",
-    "branch": "main",
-    "token": "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"
-  }
+  "leitnerIntervals": [1, 2, 4, 8, 16]
 }

@@ -31,6 +31,8 @@
   .btn-main:disabled { opacity: 0.5; cursor: default; }
   .btn-outline { width: 100%; background: #fff; color: var(--ink); border: 2px solid var(--ink);
     border-radius: 12px; padding: 12px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .btn-small { flex: 1; background: #fff; color: var(--ink); border: 1px solid var(--line);
+    border-radius: 10px; padding: 9px; font-size: 12px; font-weight: 600; cursor: pointer; }
   .btn-row { display: flex; gap: 8px; }
   .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
   .stat-box { background: var(--paper); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
@@ -40,6 +42,8 @@
   .lektion-fill { height: 100%; background: var(--gold); transition: width 0.4s; }
   .sync-note { font-size: 11px; color: var(--muted); text-align: center; margin-top: 14px; }
   .sync-note.err { color: var(--red); }
+  .sync-note.ok { color: var(--green); }
+  .tools-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 22px 0 8px; text-align: center; }
   .progress-row { display: flex; justify-content: space-between; font-size: 12px; font-family: monospace; color: var(--muted); margin-bottom: 8px; padding: 0 4px; }
   .progress-bar { width: 100%; height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; margin-bottom: 24px; }
   .progress-fill { height: 100%; background: var(--green); transition: width 0.4s; }
@@ -52,9 +56,9 @@
   .qmeta { position: absolute; top: -11px; right: 24px; background: var(--paper); padding: 2px 8px;
     font-size: 10px; color: var(--muted); font-family: monospace; border: 1px solid var(--line); border-radius: 4px; }
   .question { font-size: 26px; font-weight: bold; color: var(--ink); text-align: center; margin: 16px 0 28px; word-break: break-word; }
-  input[type=text] { width: 100%; border: none; border-bottom: 2px solid #c9bfa0; outline: none;
+  input[type=text], input[type=number] { width: 100%; border: none; border-bottom: 2px solid #c9bfa0; outline: none;
     font-size: 18px; padding: 8px; text-align: center; background: transparent; color: var(--ink); font-family: inherit; }
-  input[type=text]:focus { border-bottom-color: var(--ink); }
+  input[type=text]:focus, input[type=number]:focus { border-bottom-color: var(--ink); }
   .hint { font-size: 11px; color: var(--muted); margin-top: 10px; text-align: center; }
   .feedback { display: flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; padding: 12px; margin-bottom: 16px; font-weight: 600; }
   .feedback.correct { background: var(--green-bg); color: var(--green); }
@@ -73,10 +77,8 @@
   .errbox { background: var(--red-bg); color: var(--red); border-radius: 12px; padding: 16px; font-size: 14px; line-height: 1.5; }
   .edit-link { text-align: center; font-size: 12px; color: var(--muted); text-decoration: underline; cursor: pointer; margin-top: -14px; margin-bottom: 18px; }
   .edit-form label { display: block; font-size: 12px; color: var(--muted); margin: 12px 0 4px; }
-  .edit-form input[type=text], .edit-form input[type=number] {
-    width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
-    font-size: 15px; text-align: left; background: #fff; color: var(--ink); font-family: inherit;
-  }
+  .edit-form input { width: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+    font-size: 15px; text-align: left; background: #fff; color: var(--ink); font-family: inherit; }
   .edit-form .btn-row { margin-top: 18px; }
 </style>
 </head>
@@ -84,9 +86,7 @@
 <div class="bg-lines"></div>
 <div class="wrap">
 
-  <div id="loading" class="card">
-    <div class="spinner">Wird geladen …</div>
-  </div>
+  <div id="loading" class="card"><div class="spinner">Wird geladen …</div></div>
 
   <div id="errorScreen" class="card hidden">
     <div class="eyebrow">Fehler</div>
@@ -110,6 +110,15 @@
 
     <button class="btn-main" id="startBtn" onclick="startSession()">✨ Training starten</button>
     <div class="sync-note" id="syncNote"></div>
+
+    <div class="tools-title">Fortschritt &amp; Vokabeln</div>
+    <div class="btn-row">
+      <button class="btn-small" onclick="exportProgress()">⬇ Fortschritt sichern</button>
+      <button class="btn-small" onclick="document.getElementById('importFile').click()">⬆ Fortschritt laden</button>
+      <button class="btn-small" onclick="exportVocab()">⬇ Vokabelliste (CSV)</button>
+    </div>
+    <input type="file" id="importFile" accept="application/json" class="hidden" onchange="importProgress(event)" />
+    <div class="sync-note" id="toolsNote"></div>
   </div>
 
   <!-- QUIZ SCREEN -->
@@ -157,13 +166,13 @@
   <!-- DONE SCREEN -->
   <div id="done" class="card hidden">
     <div class="big-emoji">✨</div>
-    <div class="done-title" id="doneTitle">Sitzung beendet!</div>
+    <div class="done-title">Sitzung beendet!</div>
     <div class="stats" id="doneStats"></div>
     <div id="hardWordsBox"></div>
     <div class="btn-row">
       <button class="btn-main" onclick="location.reload()">↺ Zurück zur Übersicht</button>
     </div>
-    <div class="sync-note" id="syncNoteDone"></div>
+    <div class="sync-note ok" id="syncNoteDone"></div>
   </div>
 
 </div>
@@ -175,11 +184,9 @@
 let CONFIG = null;
 let VOCAB = [];              // [{id, begriff, uebersetzung, lektion}]
 let PROGRESS = {};           // { [id]: {box, lastSeen} }
-let PROGRESS_SHA = null;     // sha of progress.json (GitHub) for updates
-let VOCAB_SHA = null;        // sha of vokabeln.csv (GitHub) for updates
-let SESSION_QUEUE = [];      // ids for this session
+let SESSION_QUEUE = [];
 let SESSION_DONE = 0;
-let SESSION_WRONG = {};      // id -> wrong count this session
+let SESSION_WRONG = {};
 let currentId = null;
 let mode = 'answering';
 let lastCorrect = null;
@@ -195,12 +202,10 @@ function show(id) {
     document.getElementById(s).classList.toggle('hidden', s !== id);
   });
 }
-
 function fail(msg) {
   document.getElementById('errText').innerHTML = msg;
   show('errorScreen');
 }
-
 function normalize(str) {
   return str.toLowerCase()
     .replace(/\([^)]*\)/g, ' ')
@@ -212,36 +217,28 @@ function normalize(str) {
     .replace(/\s+/g, ' ')
     .trim();
 }
-function alternatives(raw) {
-  return raw.split(/[;,]/).map(normalize).filter(Boolean);
-}
-
+function alternatives(raw) { return raw.split(/[;,]/).map(normalize).filter(Boolean); }
 function shuffle(arr) {
   const a = arr.slice();
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a;
 }
-
 function parseDate(s) { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); }
-function dateStr(d) { return d.toISOString().slice(0,10); }
 function isWeekend(d) { const day = d.getDay(); return day === 0 || day === 6; }
-function inVacation(d, ranges) {
-  return ranges.some(([s,e]) => d >= parseDate(s) && d <= parseDate(e));
-}
+function inVacation(d, ranges) { return ranges.some(([s,e]) => d >= parseDate(s) && d <= parseDate(e)); }
 function isStudyDay(d, ranges) { return !isWeekend(d) && !inVacation(d, ranges); }
-
-// Zählt Lerntage zwischen start (inkl.) und end (inkl.)
 function countStudyDays(start, end, ranges) {
-  let count = 0;
-  let d = new Date(start);
-  while (d <= end) {
-    if (isStudyDay(d, ranges)) count++;
-    d.setDate(d.getDate() + 1);
-  }
+  let count = 0, d = new Date(start);
+  while (d <= end) { if (isStudyDay(d, ranges)) count++; d.setDate(d.getDate() + 1); }
   return count;
+}
+function downloadFile(filename, text, mime) {
+  const blob = new Blob([text], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 // ============================================================================
@@ -270,9 +267,7 @@ function parseCSV(text) {
   if (field !== '' || row.length) { row.push(field); rows.push(row); }
   return rows;
 }
-
 function csvField(s) { return '"' + String(s == null ? '' : s).replace(/"/g, '""') + '"'; }
-
 function serializeCSV(vocab) {
   const lines = ['begriff;uebersetzung;lektion'];
   vocab.forEach(w => lines.push(csvField(w.begriff) + ';' + csvField(w.uebersetzung) + ';' + w.lektion));
@@ -280,58 +275,12 @@ function serializeCSV(vocab) {
 }
 
 // ============================================================================
-// GitHub storage
+// Lokaler Speicher (localStorage) - einzige automatische Speicherung
 // ============================================================================
-function githubConfigured() {
-  return !!(CONFIG.github && CONFIG.github.token && CONFIG.github.owner &&
-    CONFIG.github.token.indexOf('DEIN-') !== 0 && CONFIG.github.owner.indexOf('DEIN-') !== 0);
-}
-
-function githubApiUrl(cfg, path) {
-  return `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${cfg.branch}`;
-}
-
-// Liest eine beliebige Datei aus dem Repo. Gibt {text, sha} zurück, text=null falls Datei nicht existiert.
-async function githubGetFile(cfg, path) {
-  const res = await fetch(githubApiUrl(cfg, path), {
-    headers: { Authorization: `Bearer ${cfg.token}`, Accept: 'application/vnd.github+json' }
-  });
-  if (res.status === 404) return { text: null, sha: null };
-  if (!res.ok) throw new Error(`GitHub-Abruf von "${path}" fehlgeschlagen (${res.status})`);
-  const data = await res.json();
-  const text = decodeURIComponent(escape(atob(data.content.replace(/\n/g, ''))));
-  return { text, sha: data.sha };
-}
-
-// Schreibt eine beliebige Datei ins Repo. Gibt die neue sha zurück.
-async function githubPutFile(cfg, path, text, sha, message) {
-  const content = btoa(unescape(encodeURIComponent(text)));
-  const body = { message, content, branch: cfg.branch };
-  if (sha) body.sha = sha;
-  const res = await fetch(githubApiUrl(cfg, path).split('?')[0], {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${cfg.token}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
-  if (!res.ok) throw new Error(`GitHub-Speichern von "${path}" fehlgeschlagen (${res.status})`);
-  const data = await res.json();
-  return data.content.sha;
-}
-
-async function githubLoadProgress(cfg) {
-  const { text, sha } = await githubGetFile(cfg, cfg.path);
-  PROGRESS_SHA = sha;
-  if (text === null) return {};
-  try { return JSON.parse(text); } catch { return {}; }
-}
-
-async function githubSaveProgress(cfg, progressObj) {
-  const newSha = await githubPutFile(
-    cfg, cfg.path, JSON.stringify(progressObj, null, 2), PROGRESS_SHA,
-    `Fortschritt aktualisiert – ${new Date().toISOString()}`
-  );
-  PROGRESS_SHA = newSha;
-}
+function lsGet(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; } }
+function lsSet(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; } }
+function progressKey() { return 'vt_progress::' + (CONFIG.csvFile || 'default'); }
+function overridesKey() { return 'vt_vocab_overrides::' + (CONFIG.csvFile || 'default'); }
 
 // ============================================================================
 // Init
@@ -342,17 +291,9 @@ async function init() {
     if (!cfgRes.ok) throw new Error('config.json konnte nicht geladen werden.');
     CONFIG = await cfgRes.json();
 
-    let csvText;
-    if (githubConfigured()) {
-      const { text, sha } = await githubGetFile(CONFIG.github, CONFIG.csvFile);
-      if (text === null) throw new Error(`Die Datei "${CONFIG.csvFile}" wurde im GitHub-Repo nicht gefunden. Lade sie einmalig ins Repo hoch.`);
-      csvText = text;
-      VOCAB_SHA = sha;
-    } else {
-      const csvRes = await fetch(CONFIG.csvFile);
-      if (!csvRes.ok) throw new Error(`${CONFIG.csvFile} konnte nicht geladen werden.`);
-      csvText = await csvRes.text();
-    }
+    const csvRes = await fetch(CONFIG.csvFile);
+    if (!csvRes.ok) throw new Error(`${CONFIG.csvFile} konnte nicht geladen werden.`);
+    const csvText = await csvRes.text();
     const rows = parseCSV(csvText);
     const header = rows[0].map(h => h.trim().toLowerCase());
     const iBegriff = header.indexOf('begriff');
@@ -368,6 +309,11 @@ async function init() {
       lektion: parseInt(r[iLekt], 10) || 1
     }));
     if (VOCAB.length === 0) throw new Error('Keine Vokabeln in der CSV gefunden.');
+
+    // Lokal gespeicherte Korrekturen über die Basisdaten legen
+    const overrides = lsGet(overridesKey()) || {};
+    Object.keys(overrides).forEach(id => { if (VOCAB[id]) Object.assign(VOCAB[id], overrides[id]); });
+
     totalLektionen = Math.max(...VOCAB.map(w => w.lektion));
 
     // Kalender berechnen
@@ -384,20 +330,10 @@ async function init() {
     const lessonsPerDay = Math.ceil(totalLektionen / totalLerntage);
     unlockedLektionen = Math.min(totalLektionen, lessonsPerDay * currentLerntag);
 
-    // Fortschritt laden
-    let syncMsg = '';
-    try {
-      if (githubConfigured()) {
-        PROGRESS = await githubLoadProgress(CONFIG.github);
-        syncMsg = '✓ Fortschritt aus GitHub geladen.';
-      } else {
-        syncMsg = '⚠️ Keine GitHub-Zugangsdaten in config.json – Fortschritt und Korrekturen werden nur lokal für diese Sitzung gespeichert.';
-      }
-    } catch (e) {
-      syncMsg = '⚠️ Fortschritt konnte nicht geladen werden (' + e.message + '). Es wird ohne Speicherung weitergemacht.';
-    }
+    // Fortschritt aus dem Browser laden
+    PROGRESS = lsGet(progressKey()) || {};
 
-    renderDashboard(syncMsg, totalLerntage);
+    renderDashboard(totalLerntage);
     show('setup');
   } catch (e) {
     fail('Der Trainer konnte nicht gestartet werden:<br><br><b>' + e.message + '</b><br><br>Prüfe, ob <code>config.json</code> und die Vokabel-CSV im selben Ordner wie diese Datei liegen und die Seite über einen Webserver (nicht als lokale Datei) aufgerufen wird.');
@@ -408,18 +344,17 @@ function dueWordIds() {
   const intervals = CONFIG.leitnerIntervals || [1,2,4,8,16];
   return VOCAB.filter(w => w.lektion <= unlockedLektionen).filter(w => {
     const p = PROGRESS[w.id];
-    if (!p) return true; // nie gesehen
+    if (!p) return true;
     const interval = intervals[Math.min(p.box, intervals.length) - 1] || 1;
     return (p.lastSeen + interval) <= currentLerntag;
   }).map(w => w.id);
 }
-
 function masteredCount() {
   const maxBox = (CONFIG.leitnerIntervals || [1,2,4,8,16]).length;
   return VOCAB.filter(w => w.lektion <= unlockedLektionen && PROGRESS[w.id] && PROGRESS[w.id].box >= maxBox).length;
 }
 
-function renderDashboard(syncMsg, totalLerntage) {
+function renderDashboard(totalLerntage) {
   document.getElementById('setupEyebrow').textContent = `📖 ${CONFIG.sourceLabel} → ${CONFIG.targetLabel} · Vokabeltraining`;
   document.getElementById('setupTitle').textContent = CONFIG.title || 'Vokabeltraining';
   document.getElementById('setupDesc').textContent =
@@ -431,12 +366,42 @@ function renderDashboard(syncMsg, totalLerntage) {
   document.getElementById('statMastered').textContent = masteredCount();
   document.getElementById('statLektionen').textContent = `${unlockedLektionen}/${totalLektionen}`;
   document.getElementById('lektionFill').style.width = Math.round(unlockedLektionen/totalLektionen*100) + '%';
-  document.getElementById('syncNote').textContent = syncMsg;
+  document.getElementById('syncNote').textContent = '✓ Fortschritt wird automatisch in diesem Browser gespeichert.';
 
   document.getElementById('startBtn').disabled = due === 0;
   document.getElementById('startBtn').textContent = due === 0
     ? 'Heute schon alles erledigt ✓'
     : `✨ Training starten (${Math.min(due, CONFIG.sessionSize || 25)} Wörter)`;
+}
+
+// ============================================================================
+// Fortschritt/Vokabeln: Export & Import
+// ============================================================================
+function exportProgress() {
+  downloadFile('fortschritt_' + new Date().toISOString().slice(0,10) + '.json', JSON.stringify(PROGRESS, null, 2), 'application/json');
+  document.getElementById('toolsNote').textContent = '✓ Fortschrittsdatei heruntergeladen.';
+}
+function importProgress(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imported = JSON.parse(reader.result);
+      PROGRESS = imported;
+      lsSet(progressKey(), PROGRESS);
+      document.getElementById('toolsNote').textContent = '✓ Fortschritt geladen und gespeichert.';
+      renderDashboard(Math.max(1, countStudyDays(parseDate(CONFIG.startDate), parseDate(CONFIG.endDate), CONFIG.vacationRanges || [])));
+    } catch (e) {
+      document.getElementById('toolsNote').textContent = '⚠️ Datei konnte nicht gelesen werden: ' + e.message;
+    }
+  };
+  reader.readAsText(file);
+  evt.target.value = '';
+}
+function exportVocab() {
+  downloadFile(CONFIG.csvFile || 'vokabeln.csv', serializeCSV(VOCAB), 'text/csv');
+  document.getElementById('toolsNote').textContent = '✓ Vokabelliste heruntergeladen – bei Bedarf im Repo ersetzen.';
 }
 
 // ============================================================================
@@ -489,6 +454,7 @@ function checkAnswer() {
   p.box = isCorrect ? Math.min(maxBox, p.box + 1) : 1;
   p.lastSeen = currentLerntag;
   PROGRESS[word.id] = p;
+  lsSet(progressKey(), PROGRESS); // nach jeder Antwort sichern - kein Datenverlust bei Tab schließen
 
   if (!isCorrect) SESSION_WRONG[word.id] = (SESSION_WRONG[word.id] || 0) + 1;
 
@@ -513,16 +479,14 @@ function nextWord() {
   if (!lastCorrect) {
     const insertAt = Math.min(SESSION_QUEUE.length, 4);
     SESSION_QUEUE.splice(insertAt, 0, currentId);
-    SESSION_DONE--; // wird erst als "erledigt" gezählt, wenn es richtig war
+    SESSION_DONE--;
   }
   renderCard();
 }
 
-async function finishSession() {
+function finishSession() {
   show('done');
-  document.getElementById('doneTitle').textContent = 'Sitzung beendet!';
   document.getElementById('doneStats').textContent = `${SESSION_DONE} Wörter in dieser Sitzung geschafft.`;
-
   const hard = Object.entries(SESSION_WRONG)
     .map(([id, count]) => ({ word: VOCAB[Number(id)], count }))
     .sort((a,b) => b.count - a.count);
@@ -534,30 +498,14 @@ async function finishSession() {
     });
     html += '</div>';
     box.innerHTML = html;
-  } else {
-    box.innerHTML = '';
-  }
-
-  const noteEl = document.getElementById('syncNoteDone');
-  if (githubConfigured()) {
-    noteEl.textContent = 'Fortschritt wird gespeichert …';
-    try {
-      await githubSaveProgress(CONFIG.github, PROGRESS);
-      noteEl.textContent = '✓ Fortschritt gespeichert.';
-    } catch (e) {
-      noteEl.className = 'sync-note err';
-      noteEl.textContent = '⚠️ Fortschritt konnte nicht gespeichert werden (' + e.message + '). Bitte Internetverbindung/Token prüfen.';
-    }
-  } else {
-    noteEl.textContent = 'Hinweis: Ohne GitHub-Konfiguration wird der Fortschritt nicht dauerhaft gespeichert.';
-  }
+  } else box.innerHTML = '';
+  document.getElementById('syncNoteDone').textContent = '✓ Fortschritt ist in diesem Browser gespeichert.';
 }
 
 // ============================================================================
 // Vokabel-Korrektur (während des Lernens)
 // ============================================================================
 let editPrevAnsweringVisible = true;
-
 function toggleEdit() {
   const form = document.getElementById('editForm');
   const isOpening = form.classList.contains('hidden');
@@ -581,7 +529,7 @@ function toggleEdit() {
   }
 }
 
-async function saveWordEdit() {
+function saveWordEdit() {
   const begriff = document.getElementById('editBegriff').value.trim();
   const uebersetzung = document.getElementById('editUebersetzung').value.trim();
   const lektion = parseInt(document.getElementById('editLektion').value, 10);
@@ -590,30 +538,17 @@ async function saveWordEdit() {
     return;
   }
   const word = VOCAB[currentId];
-  word.begriff = begriff;
-  word.uebersetzung = uebersetzung;
-  word.lektion = lektion;
+  word.begriff = begriff; word.uebersetzung = uebersetzung; word.lektion = lektion;
 
-  // Anzeige sofort aktualisieren
   document.getElementById('questionText').textContent = begriff;
   document.getElementById('qmeta').textContent = `Lektion ${lektion}`;
 
-  const note = document.getElementById('editSyncNote');
-  if (githubConfigured()) {
-    note.textContent = 'Wird gespeichert …';
-    try {
-      VOCAB_SHA = await githubPutFile(
-        CONFIG.github, CONFIG.csvFile, serializeCSV(VOCAB), VOCAB_SHA,
-        `Vokabel korrigiert: ${begriff} – ${new Date().toISOString()}`
-      );
-      note.textContent = '✓ Korrektur in vokabeln.csv gespeichert.';
-    } catch (e) {
-      note.textContent = '⚠️ Konnte nicht gespeichert werden (' + e.message + '). Änderung gilt nur für diese Sitzung.';
-    }
-  } else {
-    note.textContent = '⚠️ Ohne GitHub-Konfiguration gilt die Korrektur nur für diese Sitzung.';
-  }
-  setTimeout(toggleEdit, 900);
+  const overrides = lsGet(overridesKey()) || {};
+  overrides[currentId] = { begriff, uebersetzung, lektion };
+  lsSet(overridesKey(), overrides);
+
+  document.getElementById('editSyncNote').textContent = '✓ Korrektur gespeichert (in diesem Browser). Über "Vokabelliste (CSV)" im Hauptmenü kannst du sie später als Datei sichern.';
+  setTimeout(toggleEdit, 1100);
 }
 
 document.getElementById('answerInput')?.addEventListener('keydown', function(e) {
