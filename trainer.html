@@ -108,8 +108,14 @@
     </div>
     <div class="lektion-bar"><div class="lektion-fill" id="lektionFill" style="width:0%"></div></div>
 
-    <button class="btn-main" id="startBtn" onclick="startSession()">✨ Training starten</button>
+    <button class="btn-main" id="startBtn" onclick="startSession(false)">✨ Training starten</button>
     <div class="sync-note" id="syncNote"></div>
+
+    <button class="btn-outline" id="extraBtn" style="margin-top:10px" onclick="startSession('extra')">📚 Extra-Runde üben (freiwillig)</button>
+    <div class="sync-note" id="extraNote">Zusätzliches Üben, auch wenn das Tagessoll schon erfüllt ist – zieht aus allen bisher freigeschalteten Wörtern.</div>
+
+    <button class="btn-outline" id="weiterBtn" style="margin-top:10px" onclick="unlockNextLektion()">→ Nächste Lektion freischalten</button>
+    <div class="sync-note" id="weiterNote">Schaltet die nächste Lektion schon vorab frei, unabhängig vom Kalender. Noch nicht gekonnte Wörter bleiben trotzdem Teil der täglichen Sitzungen, bis sie sicher sitzen.</div>
 
     <div class="tools-title">Fortschritt &amp; Vokabeln</div>
     <div class="btn-row">
@@ -193,6 +199,9 @@ let lastCorrect = null;
 let currentLerntag = 1;
 let unlockedLektionen = 0;
 let totalLektionen = 0;
+let SESSION_MODE = 'due'; // 'due' | 'extra'
+let totalLerntage = 1;
+let manualUnlock = 0;
 
 // ============================================================================
 // Utilities
@@ -281,6 +290,7 @@ function lsGet(key) { try { const v = localStorage.getItem(key); return v ? JSON
 function lsSet(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch { return false; } }
 function progressKey() { return 'vt_progress::' + (CONFIG.csvFile || 'default'); }
 function overridesKey() { return 'vt_vocab_overrides::' + (CONFIG.csvFile || 'default'); }
+function manualUnlockKey() { return 'vt_manual_unlock::' + (CONFIG.csvFile || 'default'); }
 
 // ============================================================================
 // Init
@@ -321,19 +331,22 @@ async function init() {
     const start = parseDate(CONFIG.startDate);
     const end = parseDate(CONFIG.endDate);
     const ranges = CONFIG.vacationRanges || [];
-    const totalLerntage = Math.max(1, countStudyDays(start, end, ranges));
+    const totalLerntageVal = Math.max(1, countStudyDays(start, end, ranges));
+    totalLerntage = totalLerntageVal;
     let effectiveToday = today;
     if (today < start) effectiveToday = start;
     if (today > end) effectiveToday = end;
     currentLerntag = Math.max(1, countStudyDays(start, effectiveToday, ranges));
 
-    const lessonsPerDay = Math.ceil(totalLektionen / totalLerntage);
-    unlockedLektionen = Math.min(totalLektionen, lessonsPerDay * currentLerntag);
+    const lessonsPerDay = Math.ceil(totalLektionen / totalLerntageVal);
+    const calendarUnlocked = Math.min(totalLektionen, lessonsPerDay * currentLerntag);
+    manualUnlock = lsGet(manualUnlockKey()) || 0;
+    unlockedLektionen = Math.min(totalLektionen, Math.max(calendarUnlocked, manualUnlock));
 
     // Fortschritt aus dem Browser laden
     PROGRESS = lsGet(progressKey()) || {};
 
-    renderDashboard(totalLerntage);
+    renderDashboard(totalLerntageVal);
     show('setup');
   } catch (e) {
     fail('Der Trainer konnte nicht gestartet werden:<br><br><b>' + e.message + '</b><br><br>Prüfe, ob <code>config.json</code> und die Vokabel-CSV im selben Ordner wie diese Datei liegen und die Seite über einen Webserver (nicht als lokale Datei) aufgerufen wird.');
@@ -348,6 +361,23 @@ function dueWordIds() {
     const interval = intervals[Math.min(p.box, intervals.length) - 1] || 1;
     return (p.lastSeen + interval) <= currentLerntag;
   }).map(w => w.id);
+}
+// Für die freiwillige Extra-Runde: alle freigeschalteten Wörter, unabhängig von Fälligkeit.
+// Am wenigsten sicher gekonnte (niedrigste Box) zuerst, damit die Extra-Zeit sinnvoll genutzt wird.
+function allUnlockedWordIdsByWeakness() {
+  return VOCAB
+    .filter(w => w.lektion <= unlockedLektionen)
+    .map(w => ({ id: w.id, box: PROGRESS[w.id] ? PROGRESS[w.id].box : 0 }))
+    .sort((a, b) => a.box - b.box || Math.random() - 0.5)
+    .map(w => w.id);
+}
+// Nächste Lektion manuell freischalten, unabhängig vom Kalender.
+// Wirkt nur nach vorne (kein Zurücksetzen möglich) und bleibt dauerhaft gespeichert.
+function unlockNextLektion() {
+  manualUnlock = Math.min(totalLektionen, Math.max(unlockedLektionen, manualUnlock) + 1);
+  lsSet(manualUnlockKey(), manualUnlock);
+  unlockedLektionen = Math.max(unlockedLektionen, manualUnlock);
+  renderDashboard(totalLerntage);
 }
 function masteredCount() {
   const maxBox = (CONFIG.leitnerIntervals || [1,2,4,8,16]).length;
@@ -372,6 +402,19 @@ function renderDashboard(totalLerntage) {
   document.getElementById('startBtn').textContent = due === 0
     ? 'Heute schon alles erledigt ✓'
     : `✨ Training starten (${Math.min(due, CONFIG.sessionSize || 25)} Wörter)`;
+
+  const extraAvailable = VOCAB.some(w => w.lektion <= unlockedLektionen);
+  document.getElementById('extraBtn').disabled = !extraAvailable;
+
+  const upcomingCount = VOCAB.filter(w => w.lektion > unlockedLektionen).length;
+  const weiterBtn = document.getElementById('weiterBtn');
+  if (unlockedLektionen >= totalLektionen) {
+    weiterBtn.disabled = true;
+    weiterBtn.textContent = '→ Alle Lektionen bereits freigeschaltet';
+  } else {
+    weiterBtn.disabled = false;
+    weiterBtn.textContent = `→ Lektion ${unlockedLektionen + 1} freischalten (${upcomingCount} Wörter noch gesperrt)`;
+  }
 }
 
 // ============================================================================
@@ -407,9 +450,10 @@ function exportVocab() {
 // ============================================================================
 // Session
 // ============================================================================
-function startSession() {
-  const due = shuffle(dueWordIds());
-  SESSION_QUEUE = due.slice(0, CONFIG.sessionSize || 25);
+function startSession(modeArg) {
+  SESSION_MODE = modeArg || 'due';
+  const pool = SESSION_MODE === 'extra' ? allUnlockedWordIdsByWeakness() : shuffle(dueWordIds());
+  SESSION_QUEUE = pool.slice(0, CONFIG.sessionSize || 25);
   SESSION_DONE = 0;
   SESSION_WRONG = {};
   mode = 'answering';
@@ -419,7 +463,8 @@ function startSession() {
 
 function renderCard() {
   const total = SESSION_DONE + SESSION_QUEUE.length;
-  document.getElementById('doneCount').textContent = `${SESSION_DONE} / ${total} in dieser Sitzung`;
+  const modeLabel = SESSION_MODE === 'extra' ? ' · Extra-Runde' : '';
+  document.getElementById('doneCount').textContent = `${SESSION_DONE} / ${total} in dieser Sitzung` + modeLabel;
   document.getElementById('remainCount').textContent = `${SESSION_QUEUE.length} verbleibend`;
   document.getElementById('progressFill').style.width = total ? Math.round(SESSION_DONE/total*100) + '%' : '0%';
 
@@ -486,7 +531,8 @@ function nextWord() {
 
 function finishSession() {
   show('done');
-  document.getElementById('doneStats').textContent = `${SESSION_DONE} Wörter in dieser Sitzung geschafft.`;
+  const modeText = SESSION_MODE === 'extra' ? ' Extra-' : ' ';
+  document.getElementById('doneStats').textContent = `${SESSION_DONE} Wörter in dieser${modeText}Sitzung geschafft.`;
   const hard = Object.entries(SESSION_WRONG)
     .map(([id, count]) => ({ word: VOCAB[Number(id)], count }))
     .sort((a,b) => b.count - a.count);
