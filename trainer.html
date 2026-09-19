@@ -362,14 +362,18 @@ function dueWordIds() {
     return (p.lastSeen + interval) <= currentLerntag;
   }).map(w => w.id);
 }
+// Sortiert Wort-IDs nach Schwäche: nie gesehene Wörter zuerst, dann aufsteigend nach Box,
+// mit Zufalls-Tiebreak innerhalb derselben Box. Wird für die priorisierte Reihenfolge genutzt.
+function sortByWeakness(ids) {
+  return ids
+    .map(id => ({ id, box: PROGRESS[id] ? PROGRESS[id].box : -1, r: Math.random() }))
+    .sort((a, b) => a.box - b.box || a.r - b.r)
+    .map(x => x.id);
+}
 // Für die freiwillige Extra-Runde: alle freigeschalteten Wörter, unabhängig von Fälligkeit.
 // Am wenigsten sicher gekonnte (niedrigste Box) zuerst, damit die Extra-Zeit sinnvoll genutzt wird.
 function allUnlockedWordIdsByWeakness() {
-  return VOCAB
-    .filter(w => w.lektion <= unlockedLektionen)
-    .map(w => ({ id: w.id, box: PROGRESS[w.id] ? PROGRESS[w.id].box : 0 }))
-    .sort((a, b) => a.box - b.box || Math.random() - 0.5)
-    .map(w => w.id);
+  return sortByWeakness(VOCAB.filter(w => w.lektion <= unlockedLektionen).map(w => w.id));
 }
 // Nächste Lektion manuell freischalten, unabhängig vom Kalender.
 // Wirkt nur nach vorne (kein Zurücksetzen möglich) und bleibt dauerhaft gespeichert.
@@ -452,7 +456,7 @@ function exportVocab() {
 // ============================================================================
 function startSession(modeArg) {
   SESSION_MODE = modeArg || 'due';
-  const pool = SESSION_MODE === 'extra' ? allUnlockedWordIdsByWeakness() : shuffle(dueWordIds());
+  const pool = SESSION_MODE === 'extra' ? allUnlockedWordIdsByWeakness() : sortByWeakness(dueWordIds());
   SESSION_QUEUE = pool.slice(0, CONFIG.sessionSize || 25);
   SESSION_DONE = 0;
   SESSION_WRONG = {};
